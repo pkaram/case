@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   etcd:
     container_name: milvus-etcd
@@ -43,15 +45,16 @@ services:
       - "minio"
 
   embeddings_gen:
+    container_name: embeddings_gen
     build:
       context: ./embeddings-generator
     ports:
-      - 8080:80
+      - "8080:80"
 
   vectorizer:
+    container_name: vectorizer
     build:
       context: ./vectorizer
     depends_on:
-      - "standalone"
-      - "embeddings_gen"
-
+      - standalone
+      - embeddings_gen

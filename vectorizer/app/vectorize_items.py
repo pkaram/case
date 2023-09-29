@@ -13,9 +13,12 @@ from pymilvus import (
 
 DIM=768
 
+def sleep_for(n):
+    time.sleep(n)
+
 def vectorize_text(text):
-    time.sleep(1)
-    url = 'http://host.docker.internal:8080/embeddings'
+    sleep_for(1)
+    url = 'http://embeddings_gen:8080/embeddings'
     myobj = {"text":text}
     x = requests.post(url, json = myobj)
     return x.json()['emb_vector']
@@ -23,7 +26,7 @@ def vectorize_text(text):
 def index_to_milvus(df):
     #establish connection to milvus
     collection_name = "mspt_movies"
-    connections.connect("default", host="host.docker.internal", port="19530") #exposed to the machine with 8080
+    connections.connect("default", host="milvus-standalone", port="19530") #exposed to the machine with 8080
     has = utility.has_collection(collection_name)
     if has:
         print(f"Does collection mspt_movies_embs exist in Milvus: {has}")
@@ -47,8 +50,9 @@ def index_to_milvus(df):
     print(f"Number of inserts in Milvus: {insert_result.insert_count}")  # check the num_entites
 
 def main():
+    sleep_for(120)
     data = pd.read_csv('mpst_full_data.csv')
-    data_ = data.head(100) #keep 100 samples to showcase
+    data_ = data.head(120) #keep 100 samples to showcase
     #data_['EMB'] = data_.apply(lambda x: vectorize_text(x.plot_synopsis), axis=1)
     data_['EMB'] = None
     for i in range(len(data_)):
