@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   etcd:
     container_name: milvus-etcd
@@ -28,7 +30,7 @@ services:
 
   standalone:
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.2.8
+    image: milvusdb/milvus:v2.3.1
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
@@ -41,17 +43,21 @@ services:
     depends_on:
       - "etcd"
       - "minio"
-
+  
   embeddings_gen:
+    container_name: embeddings_gen
     build:
       context: ./embeddings-generator
     ports:
-      - 8080:80
+      - "8080:80"
 
-  vectorizer:
+  search:
+    container_name: search_text
     build:
-      context: ./vectorizer
-    depends_on:
-      - "standalone"
-      - "embeddings_gen"
+      context: ./search
+    ports:
+      - "5000:5000"
 
+networks:
+  default:
+    name: milvus
