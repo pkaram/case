@@ -1,3 +1,6 @@
+"""
+flask app to have a UI to review results based on text input
+"""
 from flask import Flask, render_template, request
 from utils import InputForm, search_similar_text
 
@@ -7,7 +10,7 @@ app = Flask(__name__, template_folder='templates')
 @app.route("/", methods=['GET', 'POST'])
 def index():
     form = InputForm(request.form)
-    if request.method == 'POST' and form.validate():        
+    if request.method == 'POST' and form.validate():
         text = request.form['Text']
         similar_text_docs = search_similar_text(text)
     else:
