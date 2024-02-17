@@ -1,11 +1,12 @@
-from fastapi import FastAPI 
+"an endpoint to provide embeddings based on given text"
+from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer('all-mpnet-base-v2')
 app = FastAPI()
 
-class Item(BaseModel):
+class Item(BaseModel):    
     text: str = ""
 
 @app.post("/embeddings")
