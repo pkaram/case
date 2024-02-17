@@ -13,7 +13,7 @@ from pymilvus import (
 class InputForm(Form):
     Text = TextAreaField('', widget=TextArea(),validators=[validators.DataRequired()])
 
-VECTORIZER_ENDPOINT = 'http://localhost:8080/embeddings'
+EMBEDDINGS_ENDPOINT = 'http://localhost:8080/embeddings'
 COLLECTION_NAME = 'mspt_movies'
 SEARCH_PARAMS = {
     "metric_type": "L2",
@@ -23,7 +23,7 @@ SEARCH_PARAMS = {
 def vectorize_text(text):
     "returns vectors for a text"    
     myobj = {"text":text}
-    x = requests.post(VECTORIZER_ENDPOINT, json = myobj, timeout=1.5)
+    x = requests.post(EMBEDDINGS_ENDPOINT, json = myobj, timeout=1.5)
     return x.json()['emb_vector']
 
 def search_similar_text(text):
