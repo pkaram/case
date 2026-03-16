@@ -1,65 +1,76 @@
 """
-It produces 
+Populates Qdrant with movie embeddings (dense vectors only).
 
-Link to download data from and store it in folder:
+Data source:
 https://www.kaggle.com/datasets/cryptexcode/mpst-movie-plot-synopses-with-tags?resource=download
+Download the csv file and store in the vectorizer folder.
 """
 import argparse
 import pandas as pd
-from pymilvus import (
-    connections,
-    utility,
-    FieldSchema, CollectionSchema, DataType,
-    Collection,
-)
-from vector_utils import vectorize_text
+from tqdm import tqdm
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+from vector_utils import vectorize_texts_batch
 
-DIM=768
+COLLECTION_NAME = "mspt_movies"
+DENSE_DIM = 384  # all-MiniLM-L6-v2
+QDRANT_HOST = "localhost"
+QDRANT_PORT = 6333
+UPSERT_BATCH_SIZE = 500
 
-def index_to_milvus(df):
-    collection_name = "mspt_movies"
-    connections.connect("default", host="localhost", port=19530)
-    has = utility.has_collection(collection_name)
-    if has:
-        print(f"Does collection mspt_movies_embs exist in Milvus: {has} and will be dropped")
-        utility.drop_collection(collection_name)
-    fields = [
-    FieldSchema(name="imdb_id", dtype=DataType.VARCHAR,
-    is_primary=True, auto_id=False, max_length=100),
-    FieldSchema(name="title", dtype=DataType.VARCHAR, auto_id=False, max_length=100),
-    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=DIM)
+
+def index_to_qdrant(df):
+    client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+
+    if client.collection_exists(COLLECTION_NAME):
+        print(f"Collection {COLLECTION_NAME} exists, recreating...")
+        client.delete_collection(COLLECTION_NAME)
+
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=DENSE_DIM, distance=Distance.EUCLID),
+    )
+
+    points = [
+        PointStruct(
+            id=idx,
+            vector=row["EMB"],
+            payload={
+                "imdb_id": row["imdb_id"],
+                "title": row["title"],
+                "plot_synopsis": row["plot_synopsis"],
+            },
+        )
+        for idx, row in df.iterrows()
     ]
-    schema = CollectionSchema(fields, "mspt_movies embeddings")
-    embs = Collection(collection_name, schema, consistency_level="Strong", auto_id=False)
-    entities = [
-    df.imdb_id.values.tolist(),
-    df.title.values.tolist(),
-    df.EMB.values.tolist(),
-    ]
-    insert_result = embs.insert(entities)
-    print(f"Number of inserts in Milvus: {insert_result.insert_count}")
-    index = {
-        "index_type": "IVF_FLAT",
-        "metric_type": "L2",
-        "params": {"nlist": 768},
-    }
-    embs.create_index("embeddings", index)
-    print("index created")
+
+    for i in tqdm(range(0, len(points), UPSERT_BATCH_SIZE), desc="Indexing", unit="batch"):
+        batch = points[i : i + UPSERT_BATCH_SIZE]
+        client.upsert(collection_name=COLLECTION_NAME, points=batch)
+    print(f"Inserted {len(points)} points into Qdrant")
+
 
 def main(arguments):
-    data = pd.read_csv('vectorizer/mpst_full_data.csv')
-    if str(arguments.items_count) == 0:
+    data = pd.read_csv("vectorizer/mpst_full_data.csv")
+    if arguments.items_count is None or arguments.items_count == 0:
         data_ = data
     else:
-        data_ = data.head(int(args.items_count))
-    data_['EMB'] = None
-    for i in range(len(data_)):
-        data_['EMB'][i] = vectorize_text(data_.plot_synopsis[i])
-    index_to_milvus(data_)
+        data_ = data.head(arguments.items_count).copy()
+
+    print(f"Indexing {len(data_)} movies...")
+    texts = data_.plot_synopsis.tolist()
+    embeddings = vectorize_texts_batch(texts, batch_size=32)
+    data_["EMB"] = embeddings
+    index_to_qdrant(data_)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-k", "--items_count", help="Description of the movie")
+    parser.add_argument(
+        "-k", "--items_count",
+        type=int,
+        default=None,
+        help="Number of movies to index (default: all)",
+    )
     args = parser.parse_args()
     main(args)

@@ -1,21 +1,15 @@
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONBUFFERED 1
 
-# Install system dependencies
 RUN apt-get update && apt-get clean
 RUN pip install --upgrade pip
 
-
-# Install requirements
 COPY requirements.txt /root/
 RUN pip install -r /root/requirements.txt
 
-COPY app.py /root/app.py
-COPY utils.py /root/utils.py
-COPY templates/index.html /root/templates/index.html
+COPY app.py utils.py /root/
 
 EXPOSE 5000
-ENV FLASK_APP=/root/app.py
-CMD flask run --host 0.0.0.0
+CMD ["streamlit", "run", "/root/app.py", "--server.port=5000", "--server.address=0.0.0.0", "--server.headless=true"]
